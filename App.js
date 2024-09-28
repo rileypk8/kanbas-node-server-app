@@ -1,6 +1,6 @@
 import express from 'express'
 import CourseRoutes from "./Kanbas/Courses/routes.js";
-import ModuleRoutes from "./Kanbas/Modules/routes.js";
+import ModuleRoutes from "./Kanbas/modules/routes.js";
 
 import Lab5 from "./Lab5/index.js";
 import cors from "cors";
