@@ -34,23 +34,32 @@ export default function UserRoutes(app) {
         res.json(status);
     };
     const signup = async (req, res) => {
+        console.log('[SIGNUP] Request body:', req.body);
         const user = await dao.findUserByUsername(req.body.username);
         if (user) {
+            console.log('[SIGNUP] Username already exists:', req.body.username);
             res.status(400).json(
                                  { message: "Username already taken" });
             return;
         }
         const currentUser = await dao.createUser(req.body);
+        console.log('[SIGNUP] Created user:', currentUser._id, currentUser.username);
         req.session["currentUser"] = currentUser;
+        console.log('[SIGNUP] Session set. Session ID:', req.sessionID);
+        console.log('[SIGNUP] Session data:', req.session);
         res.json(currentUser);
     };
     const signin = async (req, res) => {
         const { username, password } = req.body;
+        console.log('[SIGNIN] Attempting login for:', username);
         const currentUser = await dao.findUserByCredentials(username, password);
         if (currentUser) {
+            console.log('[SIGNIN] User found:', currentUser._id, currentUser.username);
             req.session["currentUser"] = currentUser;
+            console.log('[SIGNIN] Session set. Session ID:', req.sessionID);
             res.json(currentUser);
         } else {
+            console.log('[SIGNIN] User NOT found or password mismatch');
             res.status(401).json({ message: "Unable to login. Try again later." });
         }
     };
@@ -59,8 +68,12 @@ export default function UserRoutes(app) {
         res.sendStatus(200);
     };
     const profile = (req, res) => {
+        console.log('[PROFILE] Session ID:', req.sessionID);
+        console.log('[PROFILE] Session data:', req.session);
         const currentUser = req.session["currentUser"];
+        console.log('[PROFILE] Current user:', currentUser ? currentUser.username : 'NONE');
         if (!currentUser) {
+            console.log('[PROFILE] No user in session - returning 401');
             res.sendStatus(401);
             return;
         }
