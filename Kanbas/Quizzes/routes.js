@@ -18,7 +18,12 @@ export default function QuizRoutes(app) {
 
   const findQuizzesByCourse = async (req, res) => {
     const { cid } = req.params;
-    const quizzes = await quizDao.findQuizzesByCourse(cid);
+    const currentUser = req.session["currentUser"];
+    let quizzes = await quizDao.findQuizzesByCourse(cid);
+    // Filter unpublished quizzes for non-faculty
+    if (!currentUser || currentUser.role !== "FACULTY") {
+      quizzes = quizzes.filter((q) => q.published);
+    }
     res.json(quizzes);
   };
 
@@ -114,7 +119,15 @@ export default function QuizRoutes(app) {
       return;
     }
 
+    const quiz = await quizDao.findQuizById(qid);
     const attemptCount = await attemptDao.countUserAttempts(userId, qid);
+
+    // Check attempt limits (only if limit is set and > 0)
+    if (quiz.howManyAttempts > 0 && attemptCount >= quiz.howManyAttempts) {
+      res.status(403).json({ message: "Maximum attempts reached" });
+      return;
+    }
+
     const attempt = {
       user: userId,
       quiz: qid,
