@@ -73,7 +73,7 @@ echo "=== 1. QUESTION TYPES ==="
 # Create quiz with all question types
 QUIZ_RESP=$(curl -s -b faculty_cookies.txt -X POST "$BASE_URL/api/courses/$COURSE_ID/quizzes" \
   -H "Content-Type: application/json" \
-  -d '{"title":"Test Quiz - Question Types","published":true}')
+  -d '{"title":"Test Quiz - Question Types","published":true,"howManyAttempts":10}')
 QUIZ_ID=$(echo $QUIZ_RESP | python3 -c "import sys, json; print(json.load(sys.stdin)['_id'])")
 echo "[1.1] Created quiz: $QUIZ_ID"
 
@@ -132,7 +132,7 @@ echo "=== 2. SCORING ==="
 
 QUIZ_RESP=$(curl -s -b faculty_cookies.txt -X POST "$BASE_URL/api/courses/$COURSE_ID/quizzes" \
   -H "Content-Type: application/json" \
-  -d '{"title":"Test Quiz - Scoring","published":true}')
+  -d '{"title":"Test Quiz - Scoring","published":true,"howManyAttempts":10}')
 QUIZ_ID=$(echo $QUIZ_RESP | python3 -c "import sys, json; print(json.load(sys.stdin)['_id'])")
 echo "[2.1] Created quiz: $QUIZ_ID"
 
@@ -327,21 +327,59 @@ echo "[5.1] Unpublished: $QUIZ_UNPUB_ID, Published: $QUIZ_PUB_ID"
 
 # Get all quizzes as student
 ALL_QUIZZES=$(curl -s -b student_cookies.txt "$BASE_URL/api/courses/$COURSE_ID/quizzes")
-QUIZ_COUNT=$(echo $ALL_QUIZZES | python3 -c "import sys, json; print(len(json.load(sys.stdin)))")
 
 # Check if unpublished quiz is in list
 HAS_UNPUB=$(echo $ALL_QUIZZES | python3 -c "import sys, json; quizzes=json.load(sys.stdin); print('yes' if any(q['_id']=='$QUIZ_UNPUB_ID' for q in quizzes) else 'no')")
 HAS_PUB=$(echo $ALL_QUIZZES | python3 -c "import sys, json; quizzes=json.load(sys.stdin); print('yes' if any(q['_id']=='$QUIZ_PUB_ID' for q in quizzes) else 'no')")
 
-# Note: Current implementation returns all quizzes to everyone
-# This test documents current behavior - may need filtering later
-echo "    Current behavior: Student sees $QUIZ_COUNT quizzes"
-echo "    Unpublished visible: $HAS_UNPUB, Published visible: $HAS_PUB"
-echo "    (Note: Visibility filtering not yet implemented)"
-((PASS++))
+check_value "no" "$HAS_UNPUB" "Student cannot see unpublished quiz"
+check_value "yes" "$HAS_PUB" "Student can see published quiz"
+
+# Faculty should see both
+FAC_QUIZZES=$(curl -s -b faculty_cookies.txt "$BASE_URL/api/courses/$COURSE_ID/quizzes")
+FAC_HAS_UNPUB=$(echo $FAC_QUIZZES | python3 -c "import sys, json; quizzes=json.load(sys.stdin); print('yes' if any(q['_id']=='$QUIZ_UNPUB_ID' for q in quizzes) else 'no')")
+check_value "yes" "$FAC_HAS_UNPUB" "Faculty can see unpublished quiz"
 
 curl -s -b faculty_cookies.txt -X DELETE "$BASE_URL/api/quizzes/$QUIZ_UNPUB_ID" > /dev/null
 curl -s -b faculty_cookies.txt -X DELETE "$BASE_URL/api/quizzes/$QUIZ_PUB_ID" > /dev/null
+echo ""
+
+#############################################
+# SECTION 5b: Attempt Limits
+#############################################
+echo "=== 5b. ATTEMPT LIMITS ==="
+
+QUIZ_RESP=$(curl -s -b faculty_cookies.txt -X POST "$BASE_URL/api/courses/$COURSE_ID/quizzes" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Test Quiz - Limited","published":true,"howManyAttempts":2}')
+QUIZ_ID=$(echo $QUIZ_RESP | python3 -c "import sys, json; print(json.load(sys.stdin)['_id'])")
+echo "[5b.1] Created quiz with 2 attempt limit: $QUIZ_ID"
+
+Q1=$(curl -s -b faculty_cookies.txt -X POST "$BASE_URL/api/quizzes/$QUIZ_ID/questions" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"Q1","type":"TRUE_FALSE","points":10,"questionText":"Test","correctAnswer":true}')
+Q1_ID=$(echo $Q1 | python3 -c "import sys, json; print(json.load(sys.stdin)['_id'])")
+
+# Attempt 1
+ATTEMPT1=$(curl -s -b student_cookies.txt -X POST "$BASE_URL/api/quizzes/$QUIZ_ID/attempts")
+ATTEMPT1_ID=$(echo $ATTEMPT1 | python3 -c "import sys, json; print(json.load(sys.stdin)['_id'])")
+curl -s -b student_cookies.txt -X POST "$BASE_URL/api/attempts/$ATTEMPT1_ID/submit" \
+  -H "Content-Type: application/json" \
+  -d "{\"answers\":[{\"question\":\"$Q1_ID\",\"answer\":true}]}" > /dev/null
+
+# Attempt 2
+ATTEMPT2=$(curl -s -b student_cookies.txt -X POST "$BASE_URL/api/quizzes/$QUIZ_ID/attempts")
+ATTEMPT2_ID=$(echo $ATTEMPT2 | python3 -c "import sys, json; print(json.load(sys.stdin)['_id'])")
+curl -s -b student_cookies.txt -X POST "$BASE_URL/api/attempts/$ATTEMPT2_ID/submit" \
+  -H "Content-Type: application/json" \
+  -d "{\"answers\":[{\"question\":\"$Q1_ID\",\"answer\":true}]}" > /dev/null
+
+# Attempt 3 should fail
+ATTEMPT3_RESP=$(curl -s -b student_cookies.txt -X POST "$BASE_URL/api/quizzes/$QUIZ_ID/attempts" -w "\n%{http_code}")
+HTTP_CODE=$(echo "$ATTEMPT3_RESP" | tail -1)
+check_status "403" "$HTTP_CODE" "Third attempt blocked (limit is 2)"
+
+curl -s -b faculty_cookies.txt -X DELETE "$BASE_URL/api/quizzes/$QUIZ_ID" > /dev/null
 echo ""
 
 #############################################
