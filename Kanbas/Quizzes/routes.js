@@ -103,9 +103,10 @@ export default function QuizRoutes(app) {
     const attempt = await attemptDao.findAttemptById(attemptId);
     const questions = await questionDao.findQuestionsByQuiz(attempt.quiz);
 
-    // Calculate score
+    // Calculate score from submitted answers
     let score = 0;
-    attempt.answers.forEach((answer) => {
+    const submittedAnswers = req.body.answers || [];
+    submittedAnswers.forEach((answer) => {
       const question = questions.find((q) => q._id.toString() === answer.question.toString());
       if (!question) return;
 
@@ -131,7 +132,7 @@ export default function QuizRoutes(app) {
       score,
       submittedAt: new Date(),
       isComplete: true,
-      answers: req.body.answers,
+      answers: submittedAnswers,
     });
 
     res.json({ score, status });
