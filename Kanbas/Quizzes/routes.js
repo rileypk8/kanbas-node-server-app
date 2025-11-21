@@ -5,6 +5,11 @@ import * as attemptDao from "../QuizAttempts/dao.js";
 export default function QuizRoutes(app) {
   // Quiz CRUD operations
   const createQuiz = async (req, res) => {
+    const currentUser = req.session["currentUser"];
+    if (!currentUser || currentUser.role !== "FACULTY") {
+      res.sendStatus(403);
+      return;
+    }
     const { cid } = req.params;
     const quiz = { ...req.body, course: cid };
     const newQuiz = await quizDao.createQuiz(quiz);
@@ -24,12 +29,22 @@ export default function QuizRoutes(app) {
   };
 
   const updateQuiz = async (req, res) => {
+    const currentUser = req.session["currentUser"];
+    if (!currentUser || currentUser.role !== "FACULTY") {
+      res.sendStatus(403);
+      return;
+    }
     const { qid } = req.params;
     const status = await quizDao.updateQuiz(qid, req.body);
     res.json(status);
   };
 
   const deleteQuiz = async (req, res) => {
+    const currentUser = req.session["currentUser"];
+    if (!currentUser || currentUser.role !== "FACULTY") {
+      res.sendStatus(403);
+      return;
+    }
     const { qid } = req.params;
     await questionDao.deleteQuestionsByQuiz(qid);
     const status = await quizDao.deleteQuiz(qid);
@@ -37,6 +52,11 @@ export default function QuizRoutes(app) {
   };
 
   const publishQuiz = async (req, res) => {
+    const currentUser = req.session["currentUser"];
+    if (!currentUser || currentUser.role !== "FACULTY") {
+      res.sendStatus(403);
+      return;
+    }
     const { qid } = req.params;
     const { published } = req.body;
     const status = await quizDao.publishQuiz(qid, published);
@@ -45,6 +65,11 @@ export default function QuizRoutes(app) {
 
   // Question CRUD operations
   const createQuestion = async (req, res) => {
+    const currentUser = req.session["currentUser"];
+    if (!currentUser || currentUser.role !== "FACULTY") {
+      res.sendStatus(403);
+      return;
+    }
     const { qid } = req.params;
     const question = { ...req.body, quiz: qid };
     const newQuestion = await questionDao.createQuestion(question);
@@ -58,12 +83,22 @@ export default function QuizRoutes(app) {
   };
 
   const updateQuestion = async (req, res) => {
+    const currentUser = req.session["currentUser"];
+    if (!currentUser || currentUser.role !== "FACULTY") {
+      res.sendStatus(403);
+      return;
+    }
     const { questionId } = req.params;
     const status = await questionDao.updateQuestion(questionId, req.body);
     res.json(status);
   };
 
   const deleteQuestion = async (req, res) => {
+    const currentUser = req.session["currentUser"];
+    if (!currentUser || currentUser.role !== "FACULTY") {
+      res.sendStatus(403);
+      return;
+    }
     const { questionId } = req.params;
     const status = await questionDao.deleteQuestion(questionId);
     res.json(status);
