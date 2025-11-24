@@ -218,6 +218,31 @@ export default function QuizRoutes(app) {
     res.json(attempts);
   };
 
+  const getAttemptById = async (req, res) => {
+    const { attemptId } = req.params;
+    const currentUser = req.session["currentUser"];
+
+    if (!currentUser) {
+      res.sendStatus(401);
+      return;
+    }
+
+    const attempt = await attemptDao.findAttemptById(attemptId);
+    if (!attempt) {
+      res.sendStatus(404);
+      return;
+    }
+
+    // Students can only see their own attempts, faculty/admin can see all
+    const isFaculty = currentUser.role === "FACULTY" || currentUser.role === "ADMIN";
+    if (!isFaculty && attempt.user.toString() !== currentUser._id.toString()) {
+      res.sendStatus(403);
+      return;
+    }
+
+    res.json(attempt);
+  };
+
   const getCourseAttempts = async (req, res) => {
     const { cid } = req.params;
     const currentUser = req.session["currentUser"];
@@ -263,6 +288,7 @@ export default function QuizRoutes(app) {
   app.post("/api/quizzes/:qid/attempts", startAttempt);
   app.put("/api/attempts/:attemptId", saveAttemptProgress);
   app.post("/api/attempts/:attemptId/submit", submitAttempt);
+  app.get("/api/attempts/:attemptId", getAttemptById);
   app.get("/api/quizzes/:qid/attempts", getUserAttempts);
   app.get("/api/courses/:cid/quiz-attempts", getCourseAttempts);
 }
