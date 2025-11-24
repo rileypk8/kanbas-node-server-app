@@ -1,6 +1,9 @@
 {
   "type": "module",
   "name": "kanbas-node-server-app",
+  "engines": {
+    "node": "20.x"
+  },
   "version": "1.0.0",
   "description": "Node.js HTTP Web server for the Kanbas application",
   "main": "index.js",
