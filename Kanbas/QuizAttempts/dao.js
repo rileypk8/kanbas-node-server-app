@@ -22,3 +22,13 @@ export const getLatestAttempt = (userId, quizId) =>
   model.findOne({ user: userId, quiz: quizId, isComplete: true })
     .sort({ submittedAt: -1 })
     .limit(1);
+
+export const findAttemptsByCourse = async (courseId) => {
+  const Quiz = (await import("../Quizzes/model.js")).default;
+  const quizzes = await Quiz.find({ course: courseId });
+  const quizIds = quizzes.map((q) => q._id);
+  return model.find({ quiz: { $in: quizIds }, isComplete: true })
+    .populate("user")
+    .populate("quiz")
+    .sort({ submittedAt: -1 });
+};

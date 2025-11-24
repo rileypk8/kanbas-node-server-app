@@ -24,7 +24,23 @@ export default function QuizRoutes(app) {
     if (!currentUser || currentUser.role !== "FACULTY") {
       quizzes = quizzes.filter((q) => q.published);
     }
-    res.json(quizzes);
+    // Enrich with question count and best score
+    const enrichedQuizzes = await Promise.all(
+      quizzes.map(async (quiz) => {
+        const quizObj = quiz.toObject ? quiz.toObject() : quiz;
+        const questions = await questionDao.findQuestionsByQuiz(quizObj._id);
+        quizObj.questionCount = questions.length;
+        if (currentUser) {
+          const attempts = await attemptDao.findAttemptsByUserAndQuiz(currentUser._id, quizObj._id);
+          const completedAttempts = attempts.filter((a) => a.isComplete);
+          if (completedAttempts.length > 0) {
+            quizObj.bestScore = Math.max(...completedAttempts.map((a) => a.score));
+          }
+        }
+        return quizObj;
+      })
+    );
+    res.json(enrichedQuizzes);
   };
 
   const findQuizById = async (req, res) => {
@@ -35,11 +51,14 @@ export default function QuizRoutes(app) {
 
   const updateQuiz = async (req, res) => {
     const currentUser = req.session["currentUser"];
+    console.log('[UPDATE QUIZ] Session user:', currentUser?.username, 'role:', currentUser?.role);
     if (!currentUser || currentUser.role !== "FACULTY") {
+      console.log('[UPDATE QUIZ] Blocked - not faculty');
       res.sendStatus(403);
       return;
     }
     const { qid } = req.params;
+    console.log('[UPDATE QUIZ] Updating quiz', qid, 'with:', req.body);
     const status = await quizDao.updateQuiz(qid, req.body);
     res.json(status);
   };
@@ -199,6 +218,33 @@ export default function QuizRoutes(app) {
     res.json(attempts);
   };
 
+  const getCourseAttempts = async (req, res) => {
+    const { cid } = req.params;
+    const currentUser = req.session["currentUser"];
+
+    if (!currentUser) {
+      res.sendStatus(401);
+      return;
+    }
+
+    const isFaculty = currentUser.role === "FACULTY" || currentUser.role === "ADMIN";
+
+    if (isFaculty) {
+      // Faculty/admin see all attempts for the course
+      const attempts = await attemptDao.findAttemptsByCourse(cid);
+      res.json(attempts);
+    } else {
+      // Students see only their own attempts for quizzes in this course
+      const quizzes = await quizDao.findQuizzesByCourse(cid);
+      const userAttempts = [];
+      for (const quiz of quizzes) {
+        const attempts = await attemptDao.findAttemptsByUserAndQuiz(currentUser._id, quiz._id);
+        userAttempts.push(...attempts.filter(a => a.isComplete));
+      }
+      res.json(userAttempts);
+    }
+  };
+
   // Quiz routes
   app.post("/api/courses/:cid/quizzes", createQuiz);
   app.get("/api/courses/:cid/quizzes", findQuizzesByCourse);
@@ -218,4 +264,5 @@ export default function QuizRoutes(app) {
   app.put("/api/attempts/:attemptId", saveAttemptProgress);
   app.post("/api/attempts/:attemptId/submit", submitAttempt);
   app.get("/api/quizzes/:qid/attempts", getUserAttempts);
+  app.get("/api/courses/:cid/quiz-attempts", getCourseAttempts);
 }

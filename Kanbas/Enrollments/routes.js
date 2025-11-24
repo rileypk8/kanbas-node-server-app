@@ -3,11 +3,14 @@ import * as dao from "./dao.js";
 export default function EnrollmentRoutes(app) {
   const enrollUserInCourse = async (req, res) => {
     const { userId, courseId } = req.params;
+    console.log('[ENROLL] userId:', userId, 'courseId:', courseId);
     try {
       const enrollment = await dao.enrollUserInCourse(userId, courseId);
+      console.log('[ENROLL] Success:', enrollment);
       res.json(enrollment);
     } catch (err) {
-      res.status(400).json({ message: "Already enrolled" });
+      console.log('[ENROLL] Error:', err.message);
+      res.status(400).json({ message: err.message || "Already enrolled" });
     }
   };
 
